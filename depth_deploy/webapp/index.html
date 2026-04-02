@@ -887,6 +887,49 @@ PyTorch (.pt2)
                 </div>
             </div>
 
+            <div class="card" style="margin-bottom: 20px; border-left: 4px solid var(--mw-green)">
+                <h2 style="color: var(--mw-green)">S32-Compatible Implementation: Matching MATLAB Coder Properties</h2>
+                <p style="font-size: 14px; color: var(--mw-text-secondary); margin-bottom: 12px">
+                    To validate the embedded deployment analysis, we built a <strong>third implementation</strong> (<code>depth_anything_v2_s32.h</code>) that matches MATLAB Coder's code on every safety/embedded property while remaining a single ~940-line readable C++ header.
+                </p>
+                <div class="grid-3" style="margin-bottom: 16px">
+                    <div class="card metric">
+                        <div class="value" style="font-size: 28px">26.4s</div>
+                        <div class="label">S32 Inference Time</div>
+                        <div class="sub">No BLAS, scalar tiled GEMM</div>
+                    </div>
+                    <div class="card metric">
+                        <div class="value" style="font-size: 28px; color: var(--mw-orange)">2.24e-3</div>
+                        <div class="label">Relative RMSE</div>
+                        <div class="sub">Same as BLAS version</div>
+                    </div>
+                    <div class="card metric">
+                        <div class="value" style="font-size: 28px; color: var(--mw-green)">6/6</div>
+                        <div class="label">ECU Requirements Passed</div>
+                        <div class="sub">All MISRA-critical checks</div>
+                    </div>
+                </div>
+                <table>
+                    <tr><th>Property</th><th>Original Manual C++</th><th><span class="badge badge-manual">S32 Version</span></th><th><span class="badge badge-matlab">MATLAB Coder</span></th></tr>
+                    <tr><td>External BLAS</td><td><span class="badge badge-concern">Apple Accelerate</span></td><td><span class="badge badge-winner">None</span></td><td><span class="badge badge-winner">None</span></td></tr>
+                    <tr><td>Memory allocation</td><td><span class="badge badge-concern">std::vector (heap)</span></td><td><span class="badge badge-winner">Static arrays (BSS)</span></td><td><span class="badge badge-winner">Static arrays</span></td></tr>
+                    <tr><td>STL containers</td><td><span class="badge badge-concern">vector, string, ifstream</span></td><td><span class="badge badge-winner">None</span></td><td><span class="badge badge-winner">None</span></td></tr>
+                    <tr><td>Lambdas / auto / thread_local</td><td><span class="badge badge-concern">2 / 13 / 1</span></td><td><span class="badge badge-winner">0 / 0 / 0</span></td><td><span class="badge badge-winner">0 / 0 / 0</span></td></tr>
+                    <tr><td>Code traceability</td><td><span class="badge badge-concern">None</span></td><td><span class="badge badge-winner">[pt2: aten.xxx] comments</span></td><td><span class="badge badge-winner">Automatic</span></td></tr>
+                    <tr><td>Compile flags</td><td>-framework Accelerate</td><td><strong>-ffp-contract=off only</strong></td><td>-ffp-contract=off only</td></tr>
+                    <tr><td>C++ standard</td><td>C++17</td><td><strong>C++14</strong></td><td>C++14</td></tr>
+                    <tr><td>Lines of code</td><td>~693</td><td><strong>~940</strong></td><td>44,361</td></tr>
+                    <tr><td>Inference time</td><td><strong>1,043 ms</strong> (BLAS)</td><td>26,411 ms</td><td>12,918 ms</td></tr>
+                    <tr><td>Relative RMSE</td><td>2.24e-3</td><td>2.24e-3</td><td><strong>5.57e-7</strong></td></tr>
+                </table>
+                <div class="highlight-box" style="margin-top: 12px; border-left-color: var(--mw-green)">
+                    <strong>Build command:</strong> <code>clang++ -std=c++14 -O3 -ffp-contract=off -o depth_test_s32 main_s32.cpp</code> — no external libraries, no platform-specific flags. The S32 version is 2x slower than MATLAB Coder because MATLAB Coder generates 44K lines of specialized microkernel/macrokernel code with register-level tiling. Our ~940 lines of portable C++ prioritize readability and correctness over maximum throughput.
+                </div>
+                <div class="highlight-box" style="margin-top: 8px">
+                    <strong>Effort comparison:</strong> Building the S32 version took ~50 minutes with Claude Code vs the estimated 11-17 days for a human developer. MATLAB Coder generates equivalent code in 39 seconds. The gap: MATLAB Coder's output is production-certified; the S32 manual version would still need formal MISRA checker validation and traceability auditing.
+                </div>
+            </div>
+
             <div class="card">
                 <h2>Accuracy Floor Insight: Why 0.22% Is Irreducible</h2>
                 <p style="font-size: 14px; color: var(--mw-text-secondary); margin-bottom: 12px">

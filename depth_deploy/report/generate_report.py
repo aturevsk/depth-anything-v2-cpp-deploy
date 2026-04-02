@@ -559,8 +559,105 @@ def build_report():
 
     story.append(PageBreak())
 
+    # ===================== S32 IMPLEMENTATION =====================
+    story.append(Paragraph("7. S32-Compatible Implementation", styles['MWH1']))
+    story.append(Paragraph(
+        "To validate the embedded deployment analysis, a third implementation was built: "
+        "<b>depth_anything_v2_s32.h</b> (~940 lines of C++14). This version matches MATLAB Coder's generated code "
+        "on every safety/embedded property while remaining a single readable header file.",
+        styles['MWBody']))
+
+    story.append(Paragraph("7.1 Property Comparison", styles['MWH2']))
+    s32_data = [
+        ['Property', 'Original Manual C++', 'S32 Version', 'MATLAB Coder'],
+        ['External BLAS', 'Apple Accelerate', 'None', 'None'],
+        ['Memory allocation', 'std::vector (heap)', 'Static arrays (BSS)', 'Static arrays'],
+        ['STL containers', 'vector, string, ifstream', 'None', 'None'],
+        ['Lambda / auto / thread_local', '2 / 13 / 1', '0 / 0 / 0', '0 / 0 / 0'],
+        ['Code traceability', 'None', '[pt2: aten.xxx] comments', 'Automatic'],
+        ['C++ standard', 'C++17', 'C++14', 'C++14'],
+        ['Lines of code', '~693', '~940', '44,361'],
+        ['Inference time', '1,043 ms (BLAS)', '26,411 ms', '12,918 ms'],
+        ['Relative RMSE', '2.24e-3', '2.24e-3', '5.57e-7'],
+    ]
+    s32_table = Table(s32_data, colWidths=[1.3*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+    s32_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BACKGROUND', (0, 0), (-1, 0), MW_GREEN),
+        ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, MW_BORDER),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [WHITE, MW_LIGHT_BG]),
+    ]))
+    story.append(s32_table)
+    story.append(Paragraph("Table 7: S32-compatible manual C++ vs MATLAB Coder generated code", styles['MWCaption']))
+
+    story.append(Paragraph("7.2 Implementation Details", styles['MWH2']))
+    s32_details = [
+        "<b>Scalar tiled GEMM:</b> 64x64 cache-friendly tiles with M-K-N loop order. Replaces BLAS for all "
+        "~235 matrix multiplications per forward pass. Double-precision accumulation in the transposed path "
+        "(attention Q@K^T). Single-precision tiled accumulation for non-transposed linear layers.",
+        "<b>Chunked im2col:</b> Static 16 MB im2col buffer processes convolution output rows in chunks. "
+        "Eliminates the need for a dynamically-sized buffer while enabling GEMM-based convolution for "
+        "all 21 spatial (3x3) convolutions. 1x1 convolutions use direct matmul (fast path).",
+        "<b>Weight storage:</b> Single flat static array of 25.5M floats (~97 MB BSS). All weight pointers "
+        "index into this array. Loaded via C fopen/fread matching MATLAB Coder's readDnnConstants pattern.",
+        "<b>Inference buffers:</b> ~300 MB of static float arrays for encoder/decoder intermediates. "
+        "Decoder uses 6 reusable scratch buffers sized for the largest refine stage (64x296x448).",
+        "<b>Build:</b> <font face='Courier'>clang++ -std=c++14 -O3 -ffp-contract=off main_s32.cpp</font> "
+        "with zero external dependencies beyond standard C math library.",
+    ]
+    for d in s32_details:
+        story.append(Paragraph(f"  \u2022  {d}", styles['MWBody']))
+
+    story.append(Paragraph("7.3 Speed Gap Analysis", styles['MWH2']))
+    story.append(Paragraph(
+        "The S32 version runs at 26.4s vs MATLAB Coder's 12.9s (2.0x slower). The gap exists because "
+        "MATLAB Coder generates 44,361 lines of specialized microkernel/macrokernel code with register-level "
+        "tiling and loop unrolling, while the S32 implementation uses ~940 lines of generic portable C++ "
+        "prioritizing readability. On actual NXP S32G3 (Cortex-A53 @ 1.5 GHz), both implementations would "
+        "run proportionally slower than on Apple Silicon.", styles['MWBody']))
+
+    story.append(Paragraph("7.4 Development Effort", styles['MWH2']))
+    effort_data = [
+        ['Task', 'Human Estimate', 'Claude Code', 'MATLAB Coder'],
+        ['BLAS replacement', '2 days', '~5 min', 'Built-in'],
+        ['Static allocation', '1 day', '~5 min', 'Built-in'],
+        ['Weight embedding', '1 day', '~10 min', 'Built-in'],
+        ['MISRA sweep', '3-5 days', '~15 min', 'Built-in'],
+        ['Traceability', '2-3 days', '~10 min', 'Automatic'],
+        ['Testing', '2-3 days', '~5 min', 'Automatic'],
+        ['Total', '11-17 days', '~50 min', '39 seconds'],
+    ]
+    eff_table = Table(effort_data, colWidths=[1.5*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+    eff_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BACKGROUND', (0, 0), (-1, 0), MW_DARK_BLUE),
+        ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
+        ('BACKGROUND', (0, -1), (-1, -1), MW_LIGHT_BG),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, MW_BORDER),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [WHITE, MW_LIGHT_BG]),
+    ]))
+    story.append(eff_table)
+    story.append(Paragraph("Table 8: Development effort comparison for ECU-compatible code", styles['MWCaption']))
+
+    story.append(Paragraph(
+        "<b>Key insight:</b> Claude Code can produce ECU-compatible C++ in ~50 minutes that passes all six "
+        "MISRA-critical checks. However, MATLAB Coder's 39-second output is production-certified with "
+        "automatic traceability. The S32 manual version would still require formal MISRA checker validation "
+        "and traceability auditing before deployment.",
+        styles['MWHighlight']))
+
+    story.append(PageBreak())
+
     # ===================== CONCLUSION =====================
-    story.append(Paragraph("7. Conclusion", styles['MWH1']))
+    story.append(Paragraph("8. Conclusion", styles['MWH1']))
     story.append(Paragraph(
         "Two viable deployment paths exist for Depth-Anything-V2-Small:", styles['MWBody']))
     story.append(Paragraph("<b>Choose Manual C++</b> when latency matters:", styles['MWBody']))
@@ -586,9 +683,11 @@ def build_report():
     story.append(Spacer(1, 12))
     story.append(Paragraph(
         "The speed advantage of Manual C++ (12.3x) exists only on targets with BLAS (Linux ARM, macOS). "
-        "On safety-certified ECUs — the primary target for MATLAB Coder — BLAS is unavailable, both "
-        "approaches run at ~13s, and only MATLAB Coder provides certified, MISRA-compliant, traceable code. "
-        "See Section 6 for the complete embedded deployment target analysis.",
+        "On safety-certified ECUs — the primary target for MATLAB Coder — BLAS is unavailable. "
+        "The S32-compatible implementation (Section 7) demonstrates that matching MATLAB Coder's embedded "
+        "properties is achievable in ~940 lines / ~50 minutes, but the resulting code runs 2x slower than "
+        "MATLAB Coder's 44K-line optimized output, and still lacks formal certification. "
+        "See Sections 6-7 for the complete embedded deployment analysis.",
         styles['MWBody']))
 
     story.append(Spacer(1, 24))
