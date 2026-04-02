@@ -1,0 +1,14 @@
+{
+  "approach": "Manual C++ (S32-compatible)",
+  "target": "NXP S32G / Cortex-A domain controllers",
+  "blas": false,
+  "static_allocation": true,
+  "stl_containers": false,
+  "load_time_ms": 21.4,
+  "inference_time_ms": 26336.2,
+  "avg_inference_ms": 26410.8,
+  "max_abs_error": 1.733875e-02,
+  "mean_abs_error": 4.235861e-03,
+  "rmse": 5.477813e-03,
+  "relative_rmse": 2.237772e-03
+}
