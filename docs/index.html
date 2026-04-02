@@ -110,6 +110,7 @@
             <button class="nav-btn" onclick="showTab('debugging')">Debugging</button>
             <button class="nav-btn" onclick="showTab('why_accuracy')">Why Accuracy Differs</button>
             <button class="nav-btn" onclick="showTab('methodology')">Methodology</button>
+            <button class="nav-btn" onclick="showTab('embedded')">Embedded Targets</button>
         </div>
     </nav>
 
@@ -671,6 +672,237 @@ rcu2(merged); <span class="cm">// RCU2 on merged</span>
                     </div>
                 </div>
             </div>
+        </div>
+        <!-- EMBEDDED TARGETS TAB -->
+        <div id="embedded" class="tab-content">
+
+            <div class="card" style="margin-bottom: 20px">
+                <h2>Critical Insight: BLAS Dependency Determines Portability</h2>
+                <div class="verdict">
+                    <div class="highlight-box">
+                        The Manual C++ implementation's 12.3x speed advantage over MATLAB Coder exists <strong>only because Apple Accelerate (BLAS) is available</strong>. On real embedded targets — the same ECUs that MATLAB Coder is designed for — BLAS does not exist. This fundamentally changes the deployment trade-off.
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-3" style="margin-bottom: 20px">
+                <div class="card metric">
+                    <div class="value" style="color: var(--mw-orange)">Tier 1</div>
+                    <div class="label">Automotive / High-End Robotics</div>
+                    <div class="sub">Primary targets for depth estimation</div>
+                </div>
+                <div class="card metric">
+                    <div class="value" style="color: var(--mw-blue)">Tier 2</div>
+                    <div class="label">Mobile / Consumer Edge</div>
+                    <div class="sub">NPU-equipped SoCs</div>
+                </div>
+                <div class="card metric">
+                    <div class="value" style="color: var(--mw-red)">Not Viable</div>
+                    <div class="label">Bare MCU / Google Coral</div>
+                    <div class="sub">Too small for 24.7M param ViT</div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px">
+                <h2>Realistic Embedded Deployment Targets</h2>
+                <table>
+                    <tr>
+                        <th>Target</th>
+                        <th>AI Accelerator</th>
+                        <th>Peak TOPS</th>
+                        <th>Deployment Runtime</th>
+                        <th>Typical Use</th>
+                    </tr>
+                    <tr>
+                        <td><strong>NVIDIA Jetson Orin</strong></td>
+                        <td>NVDLA + CUDA</td>
+                        <td>275 (INT8)</td>
+                        <td>TensorRT</td>
+                        <td>Robotics, AV perception</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Qualcomm RIDE / Snapdragon</strong></td>
+                        <td>Hexagon NPU</td>
+                        <td>~30</td>
+                        <td>SNPE / QNN</td>
+                        <td>Automotive ADAS</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TI TDA4VM</strong></td>
+                        <td>MMA (matrix engine)</td>
+                        <td>~8</td>
+                        <td>TIDL</td>
+                        <td>Toyota / Ford supply chain</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Mobileye EyeQ6</strong></td>
+                        <td>Custom CNN accel</td>
+                        <td>N/A</td>
+                        <td>Vendor proprietary</td>
+                        <td>Camera-only AV</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Apple iPhone (ANE)</strong></td>
+                        <td>Neural Engine (16-core)</td>
+                        <td>38</td>
+                        <td>Core ML</td>
+                        <td>Consumer AR/depth apps</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Rockchip RK3588</strong></td>
+                        <td>NPU</td>
+                        <td>6</td>
+                        <td>ONNX Runtime / RKNN</td>
+                        <td>Drones, robots, SBCs</td>
+                    </tr>
+                    <tr style="opacity: 0.5">
+                        <td>Raspberry Pi 5</td>
+                        <td>None (Cortex-A76)</td>
+                        <td>~0.05</td>
+                        <td>ONNX Runtime (CPU)</td>
+                        <td>Prototyping only</td>
+                    </tr>
+                    <tr style="opacity: 0.5">
+                        <td>STM32 / bare MCU</td>
+                        <td>None</td>
+                        <td>&lt;0.01</td>
+                        <td>N/A</td>
+                        <td>Not viable (94 MB model)</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 20px">
+                <div class="card">
+                    <h2>Why Manual C++ Fails on Safety-Certified ECUs</h2>
+                    <p style="font-size: 14px; color: var(--mw-text-secondary); margin-bottom: 12px">
+                        MATLAB Coder targets AUTOSAR ECUs, ISO 26262 automotive systems, and DO-178C avionics — environments with strict requirements that our manual implementation violates:
+                    </p>
+                    <table>
+                        <tr><th>Requirement</th><th><span class="badge badge-manual">Manual C++</span></th><th><span class="badge badge-matlab">MATLAB Coder</span></th></tr>
+                        <tr>
+                            <td>No external BLAS</td>
+                            <td><span class="badge badge-concern">FAIL</span> Needs Accelerate/MKL</td>
+                            <td><span class="badge badge-winner">PASS</span> Self-contained math</td>
+                        </tr>
+                        <tr>
+                            <td>Static allocation</td>
+                            <td><span class="badge badge-concern">FAIL</span> <code>std::vector</code> heap</td>
+                            <td><span class="badge badge-winner">PASS</span> Fixed-size arrays</td>
+                        </tr>
+                        <tr>
+                            <td>No filesystem</td>
+                            <td><span class="badge badge-concern">FAIL</span> <code>std::ifstream</code></td>
+                            <td><span class="badge badge-winner">PASS</span> Pointer-based weight load</td>
+                        </tr>
+                        <tr>
+                            <td>MISRA-C++ compliance</td>
+                            <td><span class="badge badge-concern">FAIL</span> Lambdas, <code>auto</code>, TLS</td>
+                            <td><span class="badge badge-winner">PASS</span> Embedded Coder MISRA checker</td>
+                        </tr>
+                        <tr>
+                            <td>Code traceability</td>
+                            <td><span class="badge badge-concern">FAIL</span> None</td>
+                            <td><span class="badge badge-winner">PASS</span> Every line traced to graph node</td>
+                        </tr>
+                        <tr>
+                            <td>Deterministic timing</td>
+                            <td><span class="badge badge-concern">FAIL</span> Heap alloc varies</td>
+                            <td><span class="badge badge-winner">PASS</span> No heap, no surprises</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="card">
+                    <h2>Typical Production Deployment Pipelines</h2>
+                    <div class="code-block"><span class="cm">// Path A: High-performance embedded (Jetson/mobile)</span>
+PyTorch (.pt2)
+  └─► ONNX export
+        ├─► TensorRT  → Jetson Orin    <span class="num">~5-15ms</span> INT8
+        ├─► Core ML   → iPhone ANE     <span class="num">~15-30ms</span> FP16
+        ├─► SNPE/QNN  → Snapdragon     <span class="num">~20-40ms</span> INT8
+        └─► RKNN      → RK3588         <span class="num">~50-100ms</span> INT8
+
+<span class="cm">// Path B: Safety-certified ECU (AUTOSAR/ISO 26262)</span>
+PyTorch (.pt2)
+  └─► MATLAB Coder
+        └─► Embedded Coder C++
+              ├─► MISRA check
+              ├─► Code traceability audit
+              └─► Target ECU (Cortex-A)  <span class="num">~13s</span> FP32</div>
+                    <div class="highlight-box" style="margin-top: 12px">
+                        <strong>Note:</strong> Path A uses quantization (INT8) for speed. Path B uses FP32 for certification. Both bypass manual C++ entirely.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px">
+                <h2>What It Would Take to Port Manual C++ to a Safety-Certified ECU</h2>
+                <div class="grid-2" style="margin-bottom: 0">
+                    <div>
+                        <h3>Required Changes</h3>
+                        <div class="timeline">
+                            <div class="timeline-item">
+                                <div class="step-title">1. Replace BLAS</div>
+                                <div class="step-desc">Rewrite all <code>cblas_sgemm</code> calls as hand-written NEON intrinsics or link ARM Compute Library (which itself requires licensing and qualification). Without BLAS, encoder runtime returns to ~13s.</div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="step-title">2. Staticize all buffers</div>
+                                <div class="step-desc">Replace every <code>std::vector</code> (34 instance) with <code>static float buf[COMPILE_TIME_SIZE]</code>. All sizes are known at compile time — this is feasible but tedious.</div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="step-title">3. Embed weights as flash arrays</div>
+                                <div class="step-desc">Convert 234 binary weight files into <code>const float weights[] __attribute__((section(".rodata")))</code>. Adds ~94 MB to flash image. Remove all <code>std::ifstream</code> code.</div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="step-title">4. MISRA-C++ sweep</div>
+                                <div class="step-desc">Remove lambdas, <code>auto</code>, <code>thread_local</code>, range-for. Weeks of work with a MISRA checker, plus documentation of any justified deviations.</div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="step-title">5. Code traceability</div>
+                                <div class="step-desc">Manually document which code lines implement which model graph nodes — required for ISO 26262 ASIL-B/C/D certification. Not feasible to do retroactively at scale.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Effort Comparison</h3>
+                        <table>
+                            <tr><th>Task</th><th>Manual C++ port</th><th>MATLAB Coder</th></tr>
+                            <tr><td>BLAS replacement</td><td>Weeks</td><td>Built-in</td></tr>
+                            <tr><td>Static allocation</td><td>Days</td><td>Built-in</td></tr>
+                            <tr><td>Weight embedding</td><td>Days</td><td>Built-in</td></tr>
+                            <tr><td>MISRA compliance</td><td>Weeks</td><td>One checkbox</td></tr>
+                            <tr><td>Traceability</td><td>Not feasible</td><td>Automatic</td></tr>
+                            <tr><td>Model update</td><td>Redo everything</td><td>Re-run codegen (39s)</td></tr>
+                        </table>
+                        <div class="highlight-box" style="margin-top: 12px">
+                            <strong>Conclusion:</strong> For AUTOSAR / ISO 26262 / DO-178C targets, MATLAB Coder is not just more convenient — it is the <strong>architecturally correct</strong> choice. Manual C++ + BLAS is a prototyping approach suited for Linux-capable ARM boards (Jetson, RK3588) where a full OS and linkable libraries are available.
+                        </div>
+                        <div class="highlight-box" style="margin-top: 8px; border-left-color: var(--mw-green)">
+                            <strong>Speed on ECU:</strong> Without BLAS, both approaches run at ~13s on bare Cortex-A. MATLAB Coder's 13s is production-ready (certified, traceable). Manual C++'s 13s is not (no certification path).
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Accuracy Floor Insight: Why 0.22% Is Irreducible</h2>
+                <p style="font-size: 14px; color: var(--mw-text-secondary); margin-bottom: 12px">
+                    An experiment was run replacing all 31 decoder convolutions with exact-order 6-loop double-precision code to try to match PyTorch's accumulation order. Result: <strong>zero accuracy improvement, 15x slower</strong>.
+                </p>
+                <div class="grid-2" style="margin-bottom: 0">
+                    <div>
+                        <table>
+                            <tr><th>Approach</th><th>RMSE</th><th>Runtime</th></tr>
+                            <tr><td>im2col + BLAS decoder</td><td>2.24e-3</td><td><strong>1,043 ms</strong></td></tr>
+                            <tr><td>Exact-loop decoder</td><td>2.24e-3</td><td>15,300 ms</td></tr>
+                        </table>
+                    </div>
+                    <div style="font-size: 14px; color: var(--mw-text-secondary); line-height: 1.6">
+                        The error is 100% from encoder precision: 12 transformer blocks with 2073-token attention accumulate ~1.28e-4 max error, which the decoder amplifies ~750x to the final 1.22e-2 max output error. The decoder convolution order is irrelevant. To go below 0.22% RMSE with manual C++ would require matching PyTorch's exact ATen kernel accumulation order in the encoder — effectively rebuilding MATLAB Coder from scratch.
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
