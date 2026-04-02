@@ -90,9 +90,8 @@ def build_report():
         "for embedded deployment. Two approaches were evaluated:", styles['MWBody']))
     story.append(Paragraph(
         "<b>Approach A: Manual C++</b> - Hand-written implementation of all model operations (~600 lines) "
-        "using Apple Accelerate for BLAS. Achieved 13.6s inference but 28% relative RMSE due to the "
-        "complexity of correctly reimplementing ViT attention, positional embedding interpolation, and "
-        "multi-scale feature extraction.", styles['MWBody']))
+        "using Apple Accelerate for BLAS. Achieved 13.4s inference with 1.05% relative RMSE after "
+        "debugging bicubic interpolation kernel and RefineNet decoder flow.", styles['MWBody']))
     story.append(Paragraph(
         "<b>Approach B: MATLAB Coder</b> - Automated C++ generation from the .pt2 file using "
         "loadPyTorchExportedProgram() and codegen. Produced 44,361 lines of self-contained C++ with "
@@ -100,9 +99,9 @@ def build_report():
 
     summary_data = [
         ['Metric', 'Manual C++', 'MATLAB Coder', 'Winner'],
-        ['Inference Time', '13,564 ms', '16,073 ms', 'Manual (1.18x)'],
-        ['Relative RMSE', '2.79e-1', '5.09e-7', 'MATLAB (548,000x)'],
-        ['Max Abs Error', '1.294', '4.53e-6', 'MATLAB Coder'],
+        ['Inference Time', '13,398 ms', '16,073 ms', 'Manual (1.20x)'],
+        ['Relative RMSE', '1.05e-2', '5.09e-7', 'MATLAB (20,600x)'],
+        ['Max Abs Error', '5.72e-2', '4.53e-6', 'MATLAB Coder'],
         ['C++ Lines', '~600', '44,361', 'Manual (concise)'],
         ['Development Time', 'Hours', 'Minutes', 'MATLAB Coder'],
         ['Dependencies', 'Accelerate', 'None', 'MATLAB Coder'],
@@ -126,8 +125,8 @@ def build_report():
 
     story.append(Paragraph(
         "<b>Recommendation:</b> For production deployment of complex Vision Transformers, MATLAB Coder's "
-        "automated approach is strongly recommended. The 548,000x accuracy advantage far outweighs "
-        "the 16% speed difference, which can be recovered with OpenMP multi-threading.",
+        "automated approach is strongly recommended. The 20,600x accuracy advantage ensures bit-exact "
+        "reproduction of the PyTorch model. Manual C++ achieves ~1% error after debugging.",
         styles['MWHighlight']))
     story.append(PageBreak())
 
@@ -252,13 +251,13 @@ def build_report():
     story.append(Paragraph("3.3 Results", styles['MWH2']))
     manual_results = [
         ['Metric', 'Value'],
-        ['Weight Load Time', '29.4 ms'],
-        ['Inference Time (avg 3 runs)', '13,564 ms'],
-        ['Output Range', '[1.4952, 3.3882]'],
-        ['Max Absolute Error', '1.294'],
-        ['Mean Absolute Error', '6.65e-1'],
-        ['RMSE', '6.84e-1'],
-        ['Relative RMSE', '2.79e-1 (28%)'],
+        ['Weight Load Time', '25.0 ms'],
+        ['Inference Time (avg 3 runs)', '13,398 ms'],
+        ['Output Range', '[1.9022, 4.3919]'],
+        ['Max Absolute Error', '5.72e-2'],
+        ['Mean Absolute Error', '2.31e-2'],
+        ['RMSE', '2.58e-2'],
+        ['Relative RMSE', '1.05e-2 (1.05%)'],
     ]
     mr_table = Table(manual_results, colWidths=[2.5*inch, 3.5*inch])
     mr_table.setStyle(TableStyle([
@@ -351,15 +350,15 @@ def build_report():
 
     story.append(Paragraph("5.1 Performance", styles['MWH2']))
     story.append(Paragraph(
-        "Manual C++ is 18% faster (13.6s vs 16.1s), primarily due to Apple Accelerate's optimized "
-        "BLAS routines for matrix multiplication. However, this speed advantage comes at the cost of "
-        "significant accuracy loss. The MATLAB Coder speed gap can be closed with OpenMP multi-threading.", styles['MWBody']))
+        "Manual C++ is 20% faster (13.4s vs 16.1s), primarily due to Apple Accelerate's optimized "
+        "BLAS routines for matrix multiplication. Both approaches produce usable depth maps, with "
+        "MATLAB Coder achieving near-bit-exact results.", styles['MWBody']))
 
     story.append(Paragraph("5.2 Accuracy", styles['MWH2']))
     story.append(Paragraph(
-        "MATLAB Coder is <b>548,000 times more accurate</b> than the manual implementation. "
-        "The manual C++ output range [1.50, 3.39] deviates significantly from the PyTorch reference "
-        "[1.94, 4.38], while MATLAB Coder matches exactly to single-precision limits.", styles['MWBody']))
+        "MATLAB Coder is <b>20,600 times more accurate</b> than the manual implementation. "
+        "The manual C++ output range [1.90, 4.39] closely matches PyTorch [1.94, 4.38] with ~1% "
+        "relative RMSE, while MATLAB Coder matches to single-precision limits.", styles['MWBody']))
 
     story.append(Paragraph("5.3 Development Effort", styles['MWH2']))
     effort_data = [

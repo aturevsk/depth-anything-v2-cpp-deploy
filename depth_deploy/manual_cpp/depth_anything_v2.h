@@ -100,7 +100,8 @@ inline void matmul_add(const float* A, const float* B, float* C,
 // Activation Functions
 // ============================================================================
 inline float gelu(float x) {
-    return 0.5f * x * (1.0f + std::tanh(0.7978845608028654f * (x + 0.044715f * x * x * x)));
+    // Use erf-based GELU (matches PyTorch aten.gelu.default)
+    return 0.5f * x * (1.0f + std::erf(x * 0.7071067811865476f));  // 1/sqrt(2)
 }
 
 inline void gelu_inplace(float* x, int n) {
@@ -285,9 +286,10 @@ void upsample_bilinear2d(const float* input, float* output,
 // Bicubic Upsample 2D
 // ============================================================================
 inline float cubic_interp(float x) {
+    // PyTorch uses a=-0.75 coefficient (not Catmull-Rom a=-0.5)
     float ax = std::abs(x);
-    if (ax <= 1.0f) return (1.5f * ax - 2.5f) * ax * ax + 1.0f;
-    if (ax < 2.0f) return ((-0.5f * ax + 2.5f) * ax - 4.0f) * ax + 2.0f;
+    if (ax <= 1.0f) return ((1.25f * ax - 2.25f) * ax) * ax + 1.0f;
+    if (ax < 2.0f) return ((-0.75f * ax + 3.75f) * ax - 6.0f) * ax + 3.0f;
     return 0.0f;
 }
 
@@ -799,100 +801,94 @@ private:
         conv2d_nobias(s3.data(), f4.data(), w.dpt.layer4_rn_w.data(),
                       EMBED, 19, 28, 64, 3, 3, 1, 1, 1, 1);
 
-        // RefineNet Stage 4 (deepest, no merge)
+        // ===== RefineNet (corrected flow from graph trace) =====
+        // Stage 4: rcu2(f4) -> upsample -> out_conv
+        // Graph: relu(f4) -> conv -> relu -> conv -> add(result, f4) -> upsample -> out_conv
         std::vector<float> r4(64 * 19 * 28);
         auto& rs4 = w.dpt.refine[3];
         residual_conv_unit(f4.data(), r4.data(),
                            rs4.rcu2_conv1_w.data(), rs4.rcu2_conv1_b.data(),
                            rs4.rcu2_conv2_w.data(), rs4.rcu2_conv2_b.data(),
                            64, 19, 28);
-
-        // 1x1 out_conv
-        std::vector<float> r4_out(64 * 19 * 28);
-        conv2d(r4.data(), r4_out.data(), rs4.out_conv_w.data(), rs4.out_conv_b.data(),
-               64, 19, 28, 64, 1, 1, 1, 1, 0, 0);
-
-        // Upsample to [64, 37, 56]
+        // Upsample FIRST, then out_conv
         std::vector<float> r4_up(64 * GRID_H * GRID_W);
-        upsample_bilinear2d(r4_out.data(), r4_up.data(), 64, 19, 28, GRID_H, GRID_W);
+        upsample_bilinear2d(r4.data(), r4_up.data(), 64, 19, 28, GRID_H, GRID_W);
+        std::vector<float> r4_out(64 * GRID_H * GRID_W);
+        conv2d(r4_up.data(), r4_out.data(), rs4.out_conv_w.data(), rs4.out_conv_b.data(),
+               64, GRID_H, GRID_W, 64, 1, 1, 1, 1, 0, 0);
 
-        // RefineNet Stage 3: merge with f3
+        // Stage 3: rcu1(f3) -> merge(out4, rcu1_result) -> rcu2 -> upsample -> out_conv
         int sz3 = 64 * GRID_H * GRID_W;
-        std::vector<float> merged3(sz3);
-        for (int i = 0; i < sz3; i++) merged3[i] = r4_up[i] + f3[i];
-
         auto& rs3 = w.dpt.refine[2];
-        std::vector<float> r3a(sz3);
-        residual_conv_unit(merged3.data(), r3a.data(),
+        // RCU1 on f3 alone
+        std::vector<float> r3_rcu1(sz3);
+        residual_conv_unit(f3.data(), r3_rcu1.data(),
                            rs3.rcu1_conv1_w.data(), rs3.rcu1_conv1_b.data(),
                            rs3.rcu1_conv2_w.data(), rs3.rcu1_conv2_b.data(),
                            64, GRID_H, GRID_W);
+        // Merge: out_conv(stage4) + rcu1(f3)
+        std::vector<float> merged3(sz3);
+        for (int i = 0; i < sz3; i++) merged3[i] = r4_out[i] + r3_rcu1[i];
+        // RCU2 on merged
         std::vector<float> r3b(sz3);
-        residual_conv_unit(r3a.data(), r3b.data(),
+        residual_conv_unit(merged3.data(), r3b.data(),
                            rs3.rcu2_conv1_w.data(), rs3.rcu2_conv1_b.data(),
                            rs3.rcu2_conv2_w.data(), rs3.rcu2_conv2_b.data(),
                            64, GRID_H, GRID_W);
-        std::vector<float> r3_out(sz3);
-        conv2d(r3b.data(), r3_out.data(), rs3.out_conv_w.data(), rs3.out_conv_b.data(),
-               64, GRID_H, GRID_W, 64, 1, 1, 1, 1, 0, 0);
-
-        // Upsample to [64, 74, 112]
+        // Upsample then out_conv
         std::vector<float> r3_up(64 * 74 * 112);
-        upsample_bilinear2d(r3_out.data(), r3_up.data(), 64, GRID_H, GRID_W, 74, 112);
+        upsample_bilinear2d(r3b.data(), r3_up.data(), 64, GRID_H, GRID_W, 74, 112);
+        std::vector<float> r3_out(64 * 74 * 112);
+        conv2d(r3_up.data(), r3_out.data(), rs3.out_conv_w.data(), rs3.out_conv_b.data(),
+               64, 74, 112, 64, 1, 1, 1, 1, 0, 0);
 
-        // RefineNet Stage 2: merge with f2
+        // Stage 2: rcu1(f2) -> merge(out3, rcu1_result) -> rcu2 -> upsample -> out_conv
         int sz2 = 64 * 74 * 112;
-        std::vector<float> merged2(sz2);
-        for (int i = 0; i < sz2; i++) merged2[i] = r3_up[i] + f2[i];
-
         auto& rs2 = w.dpt.refine[1];
-        std::vector<float> r2a(sz2);
-        residual_conv_unit(merged2.data(), r2a.data(),
+        std::vector<float> r2_rcu1(sz2);
+        residual_conv_unit(f2.data(), r2_rcu1.data(),
                            rs2.rcu1_conv1_w.data(), rs2.rcu1_conv1_b.data(),
                            rs2.rcu1_conv2_w.data(), rs2.rcu1_conv2_b.data(),
                            64, 74, 112);
+        std::vector<float> merged2(sz2);
+        for (int i = 0; i < sz2; i++) merged2[i] = r3_out[i] + r2_rcu1[i];
         std::vector<float> r2b(sz2);
-        residual_conv_unit(r2a.data(), r2b.data(),
+        residual_conv_unit(merged2.data(), r2b.data(),
                            rs2.rcu2_conv1_w.data(), rs2.rcu2_conv1_b.data(),
                            rs2.rcu2_conv2_w.data(), rs2.rcu2_conv2_b.data(),
                            64, 74, 112);
-        std::vector<float> r2_out(sz2);
-        conv2d(r2b.data(), r2_out.data(), rs2.out_conv_w.data(), rs2.out_conv_b.data(),
-               64, 74, 112, 64, 1, 1, 1, 1, 0, 0);
-
-        // Upsample to [64, 148, 224]
         std::vector<float> r2_up(64 * 148 * 224);
-        upsample_bilinear2d(r2_out.data(), r2_up.data(), 64, 74, 112, 148, 224);
+        upsample_bilinear2d(r2b.data(), r2_up.data(), 64, 74, 112, 148, 224);
+        std::vector<float> r2_out(64 * 148 * 224);
+        conv2d(r2_up.data(), r2_out.data(), rs2.out_conv_w.data(), rs2.out_conv_b.data(),
+               64, 148, 224, 64, 1, 1, 1, 1, 0, 0);
 
-        // RefineNet Stage 1: merge with f1
+        // Stage 1: rcu1(f1) -> merge(out2, rcu1_result) -> rcu2 -> upsample(2x) -> out_conv
         int sz1 = 64 * 148 * 224;
-        std::vector<float> merged1(sz1);
-        for (int i = 0; i < sz1; i++) merged1[i] = r2_up[i] + f1[i];
-
         auto& rs1 = w.dpt.refine[0];
-        std::vector<float> r1a(sz1);
-        residual_conv_unit(merged1.data(), r1a.data(),
+        std::vector<float> r1_rcu1(sz1);
+        residual_conv_unit(f1.data(), r1_rcu1.data(),
                            rs1.rcu1_conv1_w.data(), rs1.rcu1_conv1_b.data(),
                            rs1.rcu1_conv2_w.data(), rs1.rcu1_conv2_b.data(),
                            64, 148, 224);
+        std::vector<float> merged1(sz1);
+        for (int i = 0; i < sz1; i++) merged1[i] = r2_out[i] + r1_rcu1[i];
         std::vector<float> r1b(sz1);
-        residual_conv_unit(r1a.data(), r1b.data(),
+        residual_conv_unit(merged1.data(), r1b.data(),
                            rs1.rcu2_conv1_w.data(), rs1.rcu2_conv1_b.data(),
                            rs1.rcu2_conv2_w.data(), rs1.rcu2_conv2_b.data(),
                            64, 148, 224);
-        std::vector<float> r1_out(sz1);
-        conv2d(r1b.data(), r1_out.data(), rs1.out_conv_w.data(), rs1.out_conv_b.data(),
-               64, 148, 224, 64, 1, 1, 1, 1, 0, 0);
-
-        // Upsample to [64, 296, 448]
+        // Upsample 2x: [148,224] -> [296,448]
         std::vector<float> r1_up(64 * 296 * 448);
-        upsample_bilinear2d(r1_out.data(), r1_up.data(), 64, 148, 224, 296, 448);
+        upsample_bilinear2d(r1b.data(), r1_up.data(), 64, 148, 224, 296, 448);
+        std::vector<float> r1_out(64 * 296 * 448);
+        conv2d(r1_up.data(), r1_out.data(), rs1.out_conv_w.data(), rs1.out_conv_b.data(),
+               64, 296, 448, 64, 1, 1, 1, 1, 0, 0);
 
-        // Final out_conv: 1x1 (identity-like, but we already applied it above)
         // Output head
         // Conv(64->32, 3x3, pad=1)
         std::vector<float> head1(32 * 296 * 448);
-        conv2d(r1_up.data(), head1.data(), w.dpt.out_conv1_w.data(), w.dpt.out_conv1_b.data(),
+        conv2d(r1_out.data(), head1.data(), w.dpt.out_conv1_w.data(), w.dpt.out_conv1_b.data(),
                64, 296, 448, 32, 3, 3, 1, 1, 1, 1);
 
         // Upsample [32, 296, 448] -> [32, 518, 784]

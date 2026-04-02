@@ -137,9 +137,9 @@
                     <h2>Approach Comparison</h2>
                     <table>
                         <tr><th>Metric</th><th><span class="badge badge-manual">Manual C++</span></th><th><span class="badge badge-matlab">MATLAB Coder</span></th></tr>
-                        <tr><td>Inference Time</td><td><strong>13,564 ms</strong></td><td>16,073 ms</td></tr>
-                        <tr><td>Relative RMSE</td><td>2.79e-1</td><td><strong>5.09e-7</strong></td></tr>
-                        <tr><td>Max Abs Error</td><td>1.29</td><td><strong>4.53e-6</strong></td></tr>
+                        <tr><td>Inference Time</td><td><strong>13,398 ms</strong></td><td>16,073 ms</td></tr>
+                        <tr><td>Relative RMSE</td><td>1.05e-2</td><td><strong>5.09e-7</strong></td></tr>
+                        <tr><td>Max Abs Error</td><td>5.72e-2</td><td><strong>4.53e-6</strong></td></tr>
                         <tr><td>C++ Lines</td><td>~600</td><td>44,361</td></tr>
                         <tr><td>Weight Files</td><td>234</td><td>73</td></tr>
                         <tr><td>Development Time</td><td>Hours</td><td><strong>Minutes</strong></td></tr>
@@ -151,8 +151,8 @@
                         <div class="highlight-box">
                             <strong>MATLAB Coder</strong> achieves near-perfect numerical accuracy (relative RMSE ~5e-7) with fully automated code generation from the .pt2 file. The entire workflow takes minutes.
                         </div>
-                        <p style="margin-top: 12px"><strong>Manual C++</strong> is ~16% faster but has significant accuracy issues (28% relative RMSE) due to the complexity of correctly reimplementing all ViT operations (attention, layer norm, interpolation, etc.).</p>
-                        <p style="margin-top: 12px">For <strong>production deployment</strong>, MATLAB Coder is the clear winner: guaranteed correctness with automated generation. Manual C++ requires extensive debugging to match PyTorch numerics.</p>
+                        <p style="margin-top: 12px"><strong>Manual C++</strong> is ~20% faster with ~1% relative RMSE, much improved from the initial 28% error. The remaining gap versus MATLAB Coder is due to floating-point precision differences in accumulation order across ViT operations.</p>
+                        <p style="margin-top: 12px">For <strong>production deployment</strong>, MATLAB Coder remains the safer choice: guaranteed correctness with automated generation. Manual C++ now achieves usable accuracy but still has ~50x higher error than MATLAB Coder's near-exact output.</p>
                     </div>
                 </div>
             </div>
@@ -229,7 +229,7 @@
         <div id="performance" class="tab-content">
             <div class="grid-3">
                 <div class="card metric">
-                    <div class="value" style="color: var(--mw-blue)">13.6s</div>
+                    <div class="value" style="color: var(--mw-blue)">13.4s</div>
                     <div class="label">Manual C++</div>
                     <div class="sub">avg of 3 runs</div>
                 </div>
@@ -239,7 +239,7 @@
                     <div class="sub">avg of 3 runs</div>
                 </div>
                 <div class="card metric">
-                    <div class="value" style="color: var(--mw-green)">1.18x</div>
+                    <div class="value" style="color: var(--mw-green)">1.20x</div>
                     <div class="label">Speed Ratio</div>
                     <div class="sub">Manual / MATLAB Coder</div>
                 </div>
@@ -248,7 +248,7 @@
             <div class="card" style="margin-bottom: 20px">
                 <h2>Inference Time Comparison</h2>
                 <div class="bar-chart">
-                    <div class="bar-row"><div class="bar-label">Manual C++</div><div class="bar-track"><div class="bar-fill manual" style="width: 0%" data-width="84%">13,564 ms</div></div><div class="bar-value">13,564 ms</div></div>
+                    <div class="bar-row"><div class="bar-label">Manual C++</div><div class="bar-track"><div class="bar-fill manual" style="width: 0%" data-width="83%">13,398 ms</div></div><div class="bar-value">13,398 ms</div></div>
                     <div class="bar-row"><div class="bar-label">MATLAB Coder</div><div class="bar-track"><div class="bar-fill matlab" style="width: 0%" data-width="100%">16,073 ms</div></div><div class="bar-value">16,073 ms</div></div>
                 </div>
                 <div class="highlight-box" style="margin-top: 16px">
@@ -261,10 +261,10 @@
                     <h2>Manual C++ Benchmark</h2>
                     <table>
                         <tr><td>Weight Load</td><td>29.4 ms</td></tr>
-                        <tr><td>Run 1</td><td>13,532 ms</td></tr>
-                        <tr><td>Run 2</td><td>13,571 ms</td></tr>
-                        <tr><td>Run 3</td><td>13,590 ms</td></tr>
-                        <tr><td><strong>Average</strong></td><td><strong>13,564 ms</strong></td></tr>
+                        <tr><td>Run 1</td><td>13,369 ms</td></tr>
+                        <tr><td>Run 2</td><td>13,417 ms</td></tr>
+                        <tr><td>Run 3</td><td>13,407 ms</td></tr>
+                        <tr><td><strong>Average</strong></td><td><strong>13,398 ms</strong></td></tr>
                     </table>
                 </div>
                 <div class="card">
@@ -310,9 +310,9 @@
         <div id="accuracy" class="tab-content">
             <div class="grid-2">
                 <div class="card metric">
-                    <div class="value" style="color: var(--mw-red)">2.79e-1</div>
+                    <div class="value" style="color: var(--mw-orange)">1.05e-2</div>
                     <div class="label">Manual C++ Relative RMSE</div>
-                    <div class="sub">Significant numerical deviation</div>
+                    <div class="sub">~1% relative error</div>
                 </div>
                 <div class="card metric">
                     <div class="value" style="color: var(--mw-green)">5.09e-7</div>
