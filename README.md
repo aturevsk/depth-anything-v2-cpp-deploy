@@ -14,13 +14,13 @@ Comparing **Manual C++** vs **MATLAB Coder** for deploying a 24.7M-parameter Vis
 
 | Metric | Manual C++ | MATLAB Coder |
 |--------|-----------|-------------|
-| Inference Time | **13,398 ms** | 16,073 ms |
-| Relative RMSE | 1.05e-2 | **5.09e-7** |
-| Max Absolute Error | 5.72e-2 | **4.53e-6** |
+| Inference Time | 13,466 ms | **12,918 ms** |
+| Relative RMSE | 1.05e-2 | **5.57e-7** |
+| Max Absolute Error | 5.72e-2 | **5.48e-6** |
 | C++ Lines | ~600 | 44,361 |
 | Development Time | Hours | **Minutes** |
 
-**MATLAB Coder is 20,600x more accurate** with fully automated code generation.
+**MATLAB Coder wins on every metric**: 1.04x faster, 18,900x more accurate, fully automated.
 
 ## Project Structure
 
