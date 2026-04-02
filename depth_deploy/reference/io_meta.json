@@ -1,0 +1,21 @@
+{
+  "input_shape": [
+    1,
+    3,
+    518,
+    784
+  ],
+  "input_dtype": "float32",
+  "input_bytes": 4873344,
+  "output_shape": [
+    1,
+    518,
+    784
+  ],
+  "output_dtype": "float32",
+  "output_bytes": 1624448,
+  "output_min": 1.9355450868606567,
+  "output_max": 4.383432388305664,
+  "output_mean": 2.6796329021453857,
+  "seed": 42
+}

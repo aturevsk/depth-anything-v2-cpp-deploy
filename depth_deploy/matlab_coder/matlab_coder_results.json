@@ -1,0 +1,12 @@
+{
+  "approach": "MATLAB Coder",
+  "first_call_ms": 16598.2,
+  "avg_inference_ms": 16072.8,
+  "max_abs_error": 4.529953e-06,
+  "mean_abs_error": 1.072342e-06,
+  "rmse": 1.246906e-06,
+  "relative_rmse": 5.093803e-07,
+  "generated_cpp_lines": 44361,
+  "weight_files": 73,
+  "total_weight_size_mb": 93.6
+}
